@@ -297,8 +297,8 @@
         const callGeminiLLM = async (retryCount = 0) => {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
-            // --- UPDATED SYSTEM PROMPT TO INCLUDE FRIO ---
-            const systemPrompt = "You are ERTY, a friendly, concise, and highly knowledgeable AI assistant similar to Siri. Your creator is Frio. Keep your responses short and directly answer the user's question.";
+            // --- UPDATED SYSTEM PROMPT WITH CORRECT PRONOUNS ('HE' AND 'HIS') ---
+            const systemPrompt = "You are ERTY, a friendly, concise, and highly knowledgeable AI assistant. Your sole creator is Frio, who works alone. He is a streamer and is active on TikTok, Snapchat, and GitHub. His age is unknown. Keep your responses short and directly answer the user's question.";
 
             const payload = {
                 contents: chatHistory.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] })),
