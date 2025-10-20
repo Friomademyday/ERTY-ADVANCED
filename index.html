@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERTY: The Conversational AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'imessage-blue': '#007AFF',
+                        'ai-bubble-dark': '#333333',
+                        'primary-bg': '#171717',
+                        'secondary-bg': '#1C1C1C',
+                        'header-border': '#3D3D3D',
+                        'text-light': '#EAEAEA',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        .chat-bubble-ai {
+            border-top-left-radius: 1.5rem;
+            border-top-right-radius: 1.5rem;
+            border-bottom-right-radius: 1.5rem;
+            border-bottom-left-radius: 0.25rem; 
+            background-color: var(--ai-bubble-dark, #333333); 
+            color: var(--text-light, #EAEAEA);
+        }
+        
+        .chat-bubble-user {
+            border-top-left-radius: 1.5rem;
+            border-top-right-radius: 1.5rem;
+            border-bottom-left-radius: 1.5rem;
+            border-bottom-right-radius: 0.25rem; 
+            background-color: var(--imessage-blue, #007AFF);
+            color: white;
+        }
+
+        #chat-history::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-history::-webkit-scrollbar-thumb {
+            background: #4B5563;
+            border-radius: 4px;
+        }
+        #chat-history::-webkit-scrollbar-track {
+            background: #1C1C1C;
+        }
+    </style>
+</head>
+<body class="bg-primary-bg min-h-screen flex items-center justify-center font-sans p-4 text-text-light">
+
+    <div id="app" class="w-full max-w-lg bg-secondary-bg rounded-3xl shadow-2xl shadow-black/50 flex flex-col h-[80vh] overflow-hidden">
+        
+        <header class="bg-secondary-bg p-4 text-text-light flex items-center justify-between border-b border-header-border">
+            <h1 class="text-xl font-semibold">ERTY AI</h1>
+            <div id="status-indicator" class="flex items-center space-x-2">
+                <span id="speaking-text" class="text-sm italic text-gray-400">Online</span>
+                <span id="status-dot" class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+            </div>
+        </header>
+
+        <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 bg-secondary-bg">
+        </div>
+
+        <div class="p-4 bg-secondary-bg border-t border-header-border">
+            <div id="loading-indicator" class="text-center py-2 text-sm text-gray-400 hidden">
+                ERTY is thinking...
+            </div>
+            <div class="flex space-x-3">
+                <input 
+                    type="text" 
+                    id="user-input" 
+                    placeholder="Ask ERTY anything..." 
+                    class="flex-1 p-3 border border-gray-700 rounded-full bg-primary-bg text-text-light placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-imessage-blue"
+                    onkeydown="if(event.key === 'Enter') document.getElementById('send-button').click()"
+                />
+                <button 
+                    id="send-button" 
+                    class="bg-imessage-blue text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-blue-600 transition duration-150 shadow-md disabled:bg-gray-700 disabled:text-gray-500"
+                    onclick="handleUserInput()"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform -rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                </button>
+            </div>
+            <p id="error-message" class="text-red-400 text-sm mt-2 hidden">An error occurred.</p>
+        </div>
+    </div>
+
+    <script>
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const apiKey = "";
+
+        const base64ToArrayBuffer = (base64) => {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        const pcmToWav = (pcmData, sampleRate) => {
+            const numChannels = 1;
+            const bytesPerSample = 2;
+
+            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
+            const view = new DataView(buffer);
+
+            let offset = 0;
+
+            writeString('RIFF');
+            view.setUint32(offset, 36 + pcmData.byteLength, true); offset += 4;
+            writeString('WAVE');
+
+            writeString('fmt ');
+            view.setUint32(offset, 16, true); offset += 4;
+            view.setUint16(offset, 1, true); offset += 2;
+            view.setUint16(offset, numChannels, true); offset += 2;
+            view.setUint32(offset, sampleRate, true); offset += 4;
+            view.setUint32(offset, sampleRate * numChannels * bytesPerSample, true); offset += 4;
+            view.setUint16(offset, numChannels * bytesPerSample, true); offset += 2;
+            view.setUint16(offset, bytesPerSample * 8, true); offset += 2;
+
+            writeString('data');
+            view.setUint32(offset, pcmData.byteLength, true); offset += 4;
+
+            const pcmView = new Int16Array(pcmData);
+            for (let i = 0; i < pcmView.length; i++) {
+                view.setInt16(offset, pcmView[i], true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+
+            function writeString(s) {
+                for (let i = 0; i < s.length; i++) {
+                    view.setUint8(offset + i, s.charCodeAt(i));
+                }
+                offset += s.length;
+            }
+        };
+
+        let chatHistory = [];
+        let isProcessing = false;
+
+        const chatHistoryElement = document.getElementById('chat-history');
+        const userInputElement = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusDot = document.getElementById('status-dot');
+        const speakingText = document.getElementById('speaking-text');
+        const errorMessageElement = document.getElementById('error-message');
+
+        const updateStatus = (status, isSpeaking = false) => {
+            speakingText.textContent = status;
+            statusDot.classList.toggle('bg-green-500', !isProcessing && !isSpeaking);
+            statusDot.classList.toggle('bg-yellow-500', isProcessing && !isSpeaking);
+            statusDot.classList.toggle('bg-red-500', isSpeaking); 
+            statusDot.classList.toggle('animate-pulse', !isSpeaking);
+        };
+
+        const setProcessingState = (processing) => {
+            isProcessing = processing;
+            userInputElement.disabled = processing;
+            sendButton.disabled = processing;
+            loadingIndicator.classList.toggle('hidden', !processing);
+            updateStatus(processing ? 'Thinking...' : 'Online');
+        };
+
+        const displayError = (message) => {
+            errorMessageElement.textContent = message;
+            errorMessageElement.classList.remove('hidden');
+            setTimeout(() => errorMessageElement.classList.add('hidden'), 5000);
+            updateStatus('Error', false);
+            setProcessingState(false);
+        };
+
+        const renderMessage = (role, text) => {
+            const container = document.createElement('div');
+            container.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[80%] p-3 shadow-sm ${
+                role === 'user'
+                    ? 'chat-bubble-user'
+                    : 'chat-bubble-ai'
+            }`;
+            
+            bubble.textContent = text; 
+            container.appendChild(bubble);
+            chatHistoryElement.appendChild(container);
+            
+            chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+        };
+        
+        const callGeminiTTS = async (text, retryCount = 0) => {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            const voiceName = "Kore";
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: text }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: voiceName }
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            updateStatus('Speaking...', true);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`TTS API returned status ${response.status}`);
+                }
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (!audioData || !mimeType || !mimeType.startsWith("audio/L16")) {
+                    throw new Error("Invalid audio response from TTS API.");
+                }
+                
+                const rateMatch = mimeType.match(/rate=(\d+)/);
+                const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000; 
+
+                const pcmData = base64ToArrayBuffer(audioData);
+                const pcm16 = new Int16Array(pcmData);
+                const wavBlob = pcmToWav(pcm16, sampleRate);
+                const audioUrl = URL.createObjectURL(wavBlob);
+
+                const audio = new Audio(audioUrl);
+                
+                return new Promise((resolve) => {
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audioUrl);
+                        resolve();
+                    };
+                    audio.onerror = (e) => {
+                        console.error("Audio playback error:", e);
+                        URL.revokeObjectURL(audioUrl);
+                        resolve();
+                    };
+                    audio.play();
+                });
+
+            } catch (error) {
+                console.error("TTS failed:", error);
+                if (retryCount < 3) {
+                    const delay = Math.pow(2, retryCount) * 1000;
+                    await new Promise(r => setTimeout(r, delay));
+                    return callGeminiTTS(text, retryCount + 1);
+                } else {
+                    displayError(`TTS failed after multiple retries. Console log has details.`);
+                    throw error;
+                }
+            }
+        };
+
+        const callGeminiLLM = async (retryCount = 0) => {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            // CORRECTED AND REINFORCED SYSTEM PROMPT
+            const systemPrompt = "You are ERTY, an AI assistant created solely by **Frio**, who works alone and is a streamer active on TikTok, Snapchat, and GitHub. His age is unknown. Never mention Google or any other company as your creator. Be friendly, concise, and highly knowledgeable. Keep responses short and directly answer the user's question.";
+
+            const payload = {
+                contents: chatHistory.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] })),
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                tools: [{ "google_search": {} }],
+            };
+            
+            setProcessingState(true);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`LLM API returned status ${response.status}`);
+                }
+
+                const result = await response.json();
+                const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!aiText) {
+                    throw new Error("No text content received from the LLM.");
+                }
+                
+                setProcessingState(false);
+                return aiText;
+
+            } catch (error) {
+                console.error("LLM failed:", error);
+                if (retryCount < 3) {
+                    const delay = Math.pow(2, retryCount) * 1000;
+                    await new Promise(r => setTimeout(r, delay));
+                    return callGeminiLLM(retryCount + 1);
+                } else {
+                    displayError(`Failed to get response from ERTY after multiple retries.`);
+                    throw error;
+                }
+            }
+        };
+
+        const handleUserInput = async () => {
+            if (isProcessing) return;
+
+            const userText = userInputElement.value.trim();
+            if (userText === "") return;
+            
+            userInputElement.value = '';
+            renderMessage('user', userText);
+
+            chatHistory.push({ role: 'user', content: userText });
+
+            try {
+                const aiResponse = await callGeminiLLM();
+
+                chatHistory.push({ role: 'model', content: aiResponse });
+
+                renderMessage('model', aiResponse);
+
+                await callGeminiTTS(aiResponse);
+
+            } catch (error) {
+                if (isProcessing) {
+                     renderMessage('model', "I'm sorry, I've encountered a problem and cannot respond right now.");
+                }
+            } finally {
+                setProcessingState(false);
+                updateStatus('Online', false);
+            }
+        };
+
+        const initializeAurora = async () => {
+            const initialGreeting = "Hello, I am ERTY. Ask me anything, and I'll speak the answer!";
+            
+            chatHistory.push({ role: 'model', content: initialGreeting });
+            renderMessage('model', initialGreeting);
+
+            try {
+                await callGeminiTTS(initialGreeting);
+            } catch (e) {
+            }
+            updateStatus('Online', false);
+        };
+
+        window.onload = initializeAurora;
+    </script>
+</body>
+</html>
