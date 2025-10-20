@@ -6,7 +6,6 @@
     <title>ERTY: The Conversational AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // Set the global Tailwind theme configuration
         tailwind.config = {
             theme: {
                 extend: {
@@ -28,15 +27,14 @@
             border-bottom-left-radius: 0.75rem;
             border-bottom-right-radius: 0.75rem;
             border-top-right-radius: 0.75rem;
-            background-color: #E0E7FF; /* aurora-light */
+            background-color: #E0E7FF;
         }
         .chat-bubble-user {
             border-bottom-left-radius: 0.75rem;
             border-bottom-right-radius: 0.75rem;
             border-top-left-radius: 0.75rem;
-            background-color: #4F46E5; /* aurora-blue */
+            background-color: #4F46E5;
         }
-        /* Custom scrollbar for chat history */
         #chat-history::-webkit-scrollbar {
             width: 8px;
         }
@@ -53,7 +51,6 @@
 
     <div id="app" class="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col h-[80vh] overflow-hidden">
         
-        <!-- Header -->
         <header class="bg-aurora-blue p-5 text-white shadow-lg flex items-center justify-between rounded-t-3xl">
             <h1 class="text-2xl font-bold">ERTY AI</h1>
             <div id="status-indicator" class="flex items-center space-x-2">
@@ -62,12 +59,9 @@
             </div>
         </header>
 
-        <!-- Chat History -->
         <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4">
-            <!-- Initial greeting message -->
         </div>
 
-        <!-- Input Area -->
         <div class="p-4 bg-gray-100 border-t border-gray-200">
             <div id="loading-indicator" class="text-center py-2 text-sm text-gray-500 hidden">
                 ERTY is thinking...
@@ -94,15 +88,10 @@
         </div>
     </div>
 
-    <!-- Firebase and API Setup -->
     <script>
-        // Mandatory global variables from the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const apiKey = ""; // API Key is dynamically injected by the environment if needed
+        const apiKey = "";
 
-        // --- UTILITY FUNCTIONS ---
-
-        // Converts Base64 string to ArrayBuffer
         const base64ToArrayBuffer = (base64) => {
             const binaryString = atob(base64);
             const len = binaryString.length;
@@ -113,36 +102,31 @@
             return bytes.buffer;
         };
 
-        // Converts PCM audio data into a WAV Blob
         const pcmToWav = (pcmData, sampleRate) => {
             const numChannels = 1;
-            const bytesPerSample = 2; // 16-bit PCM
+            const bytesPerSample = 2;
 
             const buffer = new ArrayBuffer(44 + pcmData.byteLength);
             const view = new DataView(buffer);
 
             let offset = 0;
 
-            // RIFF chunk descriptor
             writeString('RIFF');
             view.setUint32(offset, 36 + pcmData.byteLength, true); offset += 4;
             writeString('WAVE');
 
-            // FMT sub-chunk
             writeString('fmt ');
-            view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size
-            view.setUint16(offset, 1, true); offset += 2; // Audio format (1 = PCM)
-            view.setUint16(offset, numChannels, true); offset += 2; // Number of channels
-            view.setUint32(offset, sampleRate, true); offset += 4; // Sample rate
-            view.setUint32(offset, sampleRate * numChannels * bytesPerSample, true); offset += 4; // Byte rate
-            view.setUint16(offset, numChannels * bytesPerSample, true); offset += 2; // Block align
-            view.setUint16(offset, bytesPerSample * 8, true); offset += 2; // Bits per sample
+            view.setUint32(offset, 16, true); offset += 4;
+            view.setUint16(offset, 1, true); offset += 2;
+            view.setUint16(offset, numChannels, true); offset += 2;
+            view.setUint32(offset, sampleRate, true); offset += 4;
+            view.setUint32(offset, sampleRate * numChannels * bytesPerSample, true); offset += 4;
+            view.setUint16(offset, numChannels * bytesPerSample, true); offset += 2;
+            view.setUint16(offset, bytesPerSample * 8, true); offset += 2;
 
-            // Data sub-chunk
             writeString('data');
-            view.setUint32(offset, pcmData.byteLength, true); offset += 4; // Sub-chunk size
+            view.setUint32(offset, pcmData.byteLength, true); offset += 4;
 
-            // Write PCM data
             const pcmView = new Int16Array(pcmData);
             for (let i = 0; i < pcmView.length; i++) {
                 view.setInt16(offset, pcmView[i], true);
@@ -159,7 +143,6 @@
             }
         };
 
-        // --- CHAT STATE AND UI MANAGEMENT ---
         let chatHistory = [];
         let isProcessing = false;
 
@@ -209,15 +192,12 @@
             container.appendChild(bubble);
             chatHistoryElement.appendChild(container);
             
-            // Scroll to the latest message
             chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
         };
         
-        // --- API CALLS ---
-
         const callGeminiTTS = async (text, retryCount = 0) => {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-            const voiceName = "Kore"; // A firm, clear voice
+            const voiceName = "Kore";
 
             const payload = {
                 contents: [{
@@ -256,7 +236,6 @@
                     throw new Error("Invalid audio response from TTS API.");
                 }
                 
-                // Extract sample rate from mimeType, e.g., audio/L16;rate=24000
                 const rateMatch = mimeType.match(/rate=(\d+)/);
                 const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000; 
 
@@ -275,7 +254,7 @@
                     audio.onerror = (e) => {
                         console.error("Audio playback error:", e);
                         URL.revokeObjectURL(audioUrl);
-                        resolve(); // Resolve even on error to unblock the UI
+                        resolve();
                     };
                     audio.play();
                 });
@@ -297,7 +276,6 @@
         const callGeminiLLM = async (retryCount = 0) => {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
-            // --- UPDATED SYSTEM PROMPT WITH CORRECT PRONOUNS ('HE' AND 'HIS') ---
             const systemPrompt = "You are ERTY, a friendly, concise, and highly knowledgeable AI assistant. Your sole creator is Frio, who works alone. He is a streamer and is active on TikTok, Snapchat, and GitHub. His age is unknown. Keep your responses short and directly answer the user's question.";
 
             const payload = {
@@ -345,37 +323,28 @@
             }
         };
 
-        // --- MAIN APPLICATION LOGIC ---
-
         const handleUserInput = async () => {
             if (isProcessing) return;
 
             const userText = userInputElement.value.trim();
             if (userText === "") return;
             
-            // 1. Clear input and render user message
             userInputElement.value = '';
             renderMessage('user', userText);
 
-            // 2. Update chat history
             chatHistory.push({ role: 'user', content: userText });
 
             try {
-                // 3. Get LLM response
                 const aiResponse = await callGeminiLLM();
 
-                // 4. Update chat history with AI response
                 chatHistory.push({ role: 'model', content: aiResponse });
 
-                // 5. Render AI message
                 renderMessage('model', aiResponse);
 
-                // 6. Speak the response
                 await callGeminiTTS(aiResponse);
 
             } catch (error) {
                 console.error("Fatal chat error:", error);
-                // The error display is handled within the API call functions
                 renderMessage('model', "I'm sorry, I've encountered a problem and cannot respond right now.");
             } finally {
                 setProcessingState(false);
@@ -386,11 +355,9 @@
         const initializeAurora = async () => {
             const initialGreeting = "Hello, I am ERTY. Ask me anything, and I'll speak the answer!";
             
-            // Set initial state
             chatHistory.push({ role: 'model', content: initialGreeting });
             renderMessage('model', initialGreeting);
 
-            // Play greeting
             try {
                 await callGeminiTTS(initialGreeting);
             } catch (e) {
@@ -399,7 +366,6 @@
             updateStatus('Online', false);
         };
 
-        // Start the application when the window loads
         window.onload = initializeAurora;
     </script>
 </body>
