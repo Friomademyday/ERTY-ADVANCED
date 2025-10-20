@@ -297,8 +297,8 @@
         const callGeminiLLM = async (retryCount = 0) => {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
-            // Renamed system prompt
-            const systemPrompt = "You are ERTY, a friendly, concise, and highly knowledgeable AI assistant similar to Siri. Keep your responses short and directly answer the user's question.";
+            // --- UPDATED SYSTEM PROMPT TO INCLUDE FRIO ---
+            const systemPrompt = "You are ERTY, a friendly, concise, and highly knowledgeable AI assistant similar to Siri. Your creator is Frio. Keep your responses short and directly answer the user's question.";
 
             const payload = {
                 contents: chatHistory.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] })),
@@ -339,7 +339,7 @@
                     await new Promise(r => setTimeout(r, delay));
                     return callGeminiLLM(retryCount + 1);
                 } else {
-                    displayError(`Failed to get response from ERTY after multiple retries.`); // Updated name
+                    displayError(`Failed to get response from ERTY after multiple retries.`);
                     throw error;
                 }
             }
@@ -384,7 +384,7 @@
         };
 
         const initializeAurora = async () => {
-            const initialGreeting = "Hello, I am ERTY. Ask me anything, and I'll speak the answer!"; // Updated name
+            const initialGreeting = "Hello, I am ERTY. Ask me anything, and I'll speak the answer!";
             
             // Set initial state
             chatHistory.push({ role: 'model', content: initialGreeting });
