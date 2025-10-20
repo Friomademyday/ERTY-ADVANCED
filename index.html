@@ -100,7 +100,10 @@
 
     <script>
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const apiKey = "";
+        
+
+        const apiKey = "AIzaSyBxUq6nIlI1-x_tb0W_ICh2_bOhdlP-b0g"; 
+     
 
         const base64ToArrayBuffer = (base64) => {
             const binaryString = atob(base64);
@@ -286,7 +289,6 @@
         const callGeminiLLM = async (retryCount = 0) => {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
-            // CORRECTED AND REINFORCED SYSTEM PROMPT
             const systemPrompt = "You are ERTY, an AI assistant created solely by **Frio**, who works alone and is a streamer active on TikTok, Snapchat, and GitHub. His age is unknown. Never mention Google or any other company as your creator. Be friendly, concise, and highly knowledgeable. Keep responses short and directly answer the user's question.";
 
             const payload = {
